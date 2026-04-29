@@ -1,0 +1,358 @@
+/**
+ * bubbletree.css
+ *
+ * All visual styles for the BubbleTree library.
+ *
+ * Architecture
+ * ────────────
+ * @layer base       → resets and container geometry
+ * @layer canvas     → SVG drawing surface
+ * @layer labels     → HTML overlay labels positioned via CSS custom properties
+ * @layer tooltip    → floating tooltip card
+ * @layer animation  → keyframes + transition declarations
+ * @layer a11y       → reduced-motion overrides (always last)
+ *
+ * Label positioning is driven by CSS custom properties written by JS:
+ *   --bt-label-x, --bt-label-y  →  translate()  (GPU-composited, avoids layout)
+ *   --bt-label-width            →  width
+ *   --bt-label-opacity          →  opacity
+ *
+ * Interactions (hover, cursor, active state) are handled purely in CSS,
+ * replacing the original jQuery .css() / inline-style calls.
+ */
+
+/* ─── Layer declaration order ─────────────────────────────────────────────── */
+@layer base, canvas, labels, tooltip, animation, a11y;
+
+/* ══════════════════════════════════════════════════════════════════
+   BASE
+══════════════════════════════════════════════════════════════════ */
+@layer base {
+  /* @property declarations give the browser typed information for transitions */
+  @property --bt-label-x {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+  }
+  @property --bt-label-y {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+  }
+  @property --bt-label-width {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 120px;
+  }
+  @property --bt-label-opacity {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 1;
+  }
+
+  /* Design tokens */
+  :root {
+    --bt-font-sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --bt-font-serif: Georgia, "Times New Roman", serif;
+    --bt-color-label-inner: #fff;
+    --bt-color-label-outer: #000;
+    --bt-color-label-outer-bg: #fff;
+    --bt-color-ring: #888;
+    --bt-color-tooltip-bg: #fff;
+    --bt-color-tooltip-border: #999;
+    --bt-color-tooltip-shadow: rgba(0 0 0 / 0.2);
+    --bt-radius-tooltip: 4px;
+    --bt-transition-duration: 300ms;
+    --bt-transition-easing: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .bubbletree-wrapper {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .bubbletree {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #fff;
+    container-type: size;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CANVAS  (SVG surface)
+══════════════════════════════════════════════════════════════════ */
+@layer canvas {
+  .bubbletree-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+
+    /* Bubbles */
+    & .bubbletree-bubble {
+      transition:
+        r var(--bt-transition-duration) var(--bt-transition-easing),
+        cx var(--bt-transition-duration) var(--bt-transition-easing),
+        cy var(--bt-transition-duration) var(--bt-transition-easing),
+        fill-opacity var(--bt-transition-duration) ease;
+
+      &:hover {
+        filter: brightness(1.12);
+      }
+
+      &[style*="cursor: pointer"]:active {
+        filter: brightness(0.9) saturate(1.2);
+      }
+    }
+
+    /* Dashed inner border ring */
+    & .bubbletree-dashed {
+      pointer-events: none;
+      transition:
+        r var(--bt-transition-duration) var(--bt-transition-easing),
+        cx var(--bt-transition-duration) var(--bt-transition-easing),
+        cy var(--bt-transition-duration) var(--bt-transition-easing),
+        stroke-opacity var(--bt-transition-duration) ease;
+    }
+
+    /* Orbital ring around parent bubbles */
+    & .bubbletree-ring {
+      stroke: var(--bt-color-ring);
+      stroke-dasharray: 4 4;
+      fill: none;
+      pointer-events: none;
+      transition:
+        r var(--bt-transition-duration) var(--bt-transition-easing),
+        stroke-opacity var(--bt-transition-duration) ease;
+    }
+
+    /* SVG-embedded icon paths */
+    & .bubbletree-icon {
+      fill: #fff;
+      pointer-events: none;
+      transition: fill-opacity var(--bt-transition-duration) ease;
+    }
+
+    /* Donut breakdown arc segments */
+    & .bubbletree-arc {
+      stroke: #fff;
+      cursor: pointer;
+      transition:
+        fill-opacity var(--bt-transition-duration) ease,
+        stroke-opacity var(--bt-transition-duration) ease;
+
+      &:hover {
+        filter: brightness(1.1);
+      }
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LABELS  (HTML overlays, positioned with CSS custom properties)
+══════════════════════════════════════════════════════════════════ */
+@layer labels {
+  /* Shared positioning mixin (applied via nesting below) */
+  .bubbletree {
+    & .bubbletree-label,
+    & .bubbletree-label2 {
+      position: absolute;
+      /* Translate instead of top/left to keep in the GPU compositor layer */
+      left: 0;
+      top: 0;
+      translate: var(--bt-label-x) var(--bt-label-y);
+      width: var(--bt-label-width);
+      opacity: var(--bt-label-opacity);
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+      /* Smooth position / opacity changes driven by JS updates */
+      transition:
+        translate var(--bt-transition-duration) var(--bt-transition-easing),
+        width var(--bt-transition-duration) var(--bt-transition-easing),
+        opacity var(--bt-transition-duration) ease;
+
+      /* Restore interactivity when cursor is pointer */
+      &[style*="cursor: pointer"] {
+        pointer-events: auto;
+      }
+
+      &[hidden] {
+        display: none;
+      }
+
+      &.current {
+        font-weight: 600;
+      }
+    }
+
+    /* Inner label (shown when bubble is large enough) */
+    & .bubbletree-label {
+      color: var(--bt-color-label-inner);
+
+      & .bubbletree-amount {
+        font-family: var(--bt-font-serif);
+        font-size: clamp(0.6rem, 2cqi, 1.1rem);
+        font-weight: 400;
+        line-height: 1.2;
+      }
+
+      & .bubbletree-desc {
+        font-family: var(--bt-font-sans);
+        font-size: clamp(0.5rem, 1.5cqi, 0.75rem);
+        line-height: 1.3;
+        margin-top: 0.15em;
+
+        &[hidden] {
+          display: none;
+        }
+      }
+    }
+
+    /* Outer label (shown below bubble when it is too small for inner text) */
+    & .bubbletree-label2 {
+      color: var(--bt-color-label-outer);
+      font-family: var(--bt-font-sans);
+      font-size: clamp(0.55rem, 1.4cqi, 0.7rem);
+      margin-top: 5px;
+      pointer-events: none;
+
+      & span {
+        display: inline-block;
+        background: var(--bt-color-label-outer-bg);
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TOOLTIP
+══════════════════════════════════════════════════════════════════ */
+@layer tooltip {
+  .bubbletree-wrapper .tooltip,
+  #tooltip {
+    position: absolute;
+    z-index: 3000;
+    max-width: 240px;
+    background: var(--bt-color-tooltip-bg);
+    border: 1px solid var(--bt-color-tooltip-border);
+    border-radius: var(--bt-radius-tooltip);
+    box-shadow: 3px 3px 8px var(--bt-color-tooltip-shadow);
+    font-family: var(--bt-font-sans);
+    font-size: 0.8rem;
+    padding: 6px;
+    /* Entrance animation */
+    animation: bt-tooltip-in 160ms ease both;
+
+    & .header {
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      & .icon {
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #600;
+      }
+    }
+
+    & .row {
+      border-top: 1px solid var(--bt-color-tooltip-border);
+      padding: 6px;
+    }
+
+    & .amount,
+    & h3 {
+      font-weight: 600;
+      margin: 0;
+    }
+
+    & div,
+    & p {
+      margin: 0;
+    }
+
+    & svg {
+      display: block;
+      width: 100px;
+      height: 100px;
+      fill: currentColor;
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ANIMATIONS  (keyframes)
+══════════════════════════════════════════════════════════════════ */
+@layer animation {
+  @keyframes bt-tooltip-in {
+    from {
+      opacity: 0;
+      scale: 0.95;
+      translate: 0 -4px;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+      translate: 0 0;
+    }
+  }
+
+  @keyframes bt-bubble-enter {
+    from {
+      opacity: 0;
+      scale: 0.6;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+
+  @keyframes bt-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
+  }
+
+  /* Loading spinner shown while data fetches */
+  .bubbletree-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 1000;
+    animation: bt-pulse 1.4s ease infinite;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   A11Y  — respect user preference for reduced motion
+══════════════════════════════════════════════════════════════════ */
+@layer a11y {
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --bt-transition-duration: 0ms;
+    }
+
+    .bubbletree-loading {
+      animation: none;
+    }
+
+    .bubbletree-wrapper .tooltip,
+    #tooltip {
+      animation: none;
+    }
+  }
+}

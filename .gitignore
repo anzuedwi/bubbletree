@@ -1,6 +1,19 @@
+# Editor / OS
 .watchr
 .idea
 *.sublime-project
 *.sublime-workspace
-node_modules
-bower_components
+.DS_Store
+*.swp
+
+# Dependencies
+node_modules/
+bower_components/
+
+# Build output
+dist/
+*.js.map
+
+# Vite / TypeScript
+vite.config.ts.timestamp-*
+tsconfig.tsbuildinfo

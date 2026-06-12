@@ -156,11 +156,17 @@ export class BubbleTree {
   /**
    * If maxNodesPerLevel is set, collapse excess children into a synthetic
    * "More" node so the ring stays readable.
+   *
+   * Strategy: sort by amount descending, keep the top N, and pack everything
+   * else into a synthetic node whose amount equals the sum of its children's
+   * amounts. The synthetic node is also clickable and will reveal its
+   * contents when zoomed into.
    */
   private preprocessData(root: BubbleNode): void {
     const max = this.config.maxNodesPerLevel;
     if (!max || !root.children || root.children.length <= max) return;
 
+    // sortChildren ascending → reverse gives descending by amount
     const sorted = this.sortChildren([...root.children]);
     sorted.reverse();
 
@@ -170,7 +176,12 @@ export class BubbleTree {
 
     sorted.forEach((child, i) => {
       if (i < max) { keep.push(child); }
-      else { move.push(child); moveAmount += Math.max(0, child.amount); }
+      else {
+        move.push(child);
+        // Negative amounts are clamped to 0 so the "More" total doesn't
+        // shrink the bubble below visibility.
+        moveAmount += Math.max(0, child.amount);
+      }
     });
 
     root.children = [
@@ -553,6 +564,13 @@ export class BubbleTree {
     return a;
   }
 
+  /**
+   * Returns the shortest signed angular delta from `from` to `to`,
+   * choosing the side of the circle that requires less rotation.
+   *
+   * Without this, a bubble at θ = 350° tweening to θ = 10° would spin
+   * the long way (340° backward) instead of the short way (20° forward).
+   */
   private shortestAngle(from: number, to: number): number {
     const twopi = Math.PI * 2;
     const f = this.unifyAngle(from);
@@ -590,6 +608,17 @@ export class BubbleTree {
   // Sorting
   // ---------------------------------------------------------------------------
 
+  /**
+   * Sort children for ring placement.
+   *
+   * When `alternate` is true (the default for amount sorting) the result is
+   * interleaved: largest, smallest, 2nd largest, 2nd smallest, etc. This
+   * prevents the ring from clustering all the big bubbles on one side and
+   * all the tiny ones on the other.
+   *
+   * When sorting by label we keep a simple alphabetical order — alternating
+   * would scramble the names.
+   */
   private sortChildren(
     children: BubbleNode[],
     alternate = false,
@@ -602,7 +631,8 @@ export class BubbleTree {
     const sorted = [...children].sort(compareFn);
     if (!alternate) return sorted;
 
-    // Interleave largest + smallest so the ring looks balanced
+    // Two-pointer interleave: take from the top, then from the bottom,
+    // alternating until we meet in the middle.
     const result: BubbleNode[] = [];
     let lo = 0, hi = sorted.length - 1, useHi = true;
     while (lo <= hi) {

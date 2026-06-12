@@ -40,6 +40,10 @@ export class Transitioner {
       return;
     }
 
+    // Snapshot the "from" value of every animated property *before* the
+    // first frame fires.  Without this we would interpolate against a moving
+    // target on every tick (the actual target value is overwritten on every
+    // frame), producing exponential decay instead of a clean lerp.
     const start = performance.now();
     const fromStates = layout.objects.map((target, i) => {
       const props = layout.props[i]!;
@@ -51,7 +55,11 @@ export class Transitioner {
     });
 
     const tick = (now: number) => {
+      // Bail if this transitioner has been cancelled or superseded.
       if (!this.running || this.layout !== layout) return;
+      // Normalise wall-clock progress to [0, 1] then apply the easing curve.
+      // easeExpOut gives a fast start and a gentle settle, matching the look
+      // of the original Tween.js Exponential.Out easing.
       const t = Math.min(1, (now - start) / this.duration);
       const eased = easeExpOut(t);
 

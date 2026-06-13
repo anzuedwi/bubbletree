@@ -16,6 +16,7 @@ import { cssToken } from '../util/css.js';
 import { formatNumber } from '../util/format.js';
 import { hslColor, adjustLightness, adjustSaturation } from '../util/color.js';
 import { amountToRadius, setRadiusBase } from './utils.js';
+import { shortestAngleTo } from './angles.js';
 import { Vector } from './vector.js';
 import { Layout } from './layout.js';
 import { Ring } from './ring.js';
@@ -484,7 +485,7 @@ export class BubbleTree {
       for (const cn of root.children ?? []) {
         const b = getBubble(cn);
         if (!b) continue;
-        layout.$(b).angle = this.shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0));
+        layout.$(b).angle = shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0));
         layout.$(b).rad = rad1;
       }
     } else {
@@ -497,7 +498,7 @@ export class BubbleTree {
 
       const parent = getBubble(node);
       if (!parent) return;
-      layout.$(parent).angle = this.shortestAngleTo(parent.angle, 0);
+      layout.$(parent).angle = shortestAngleTo(parent.angle, 0);
 
       const rad1 = (a2rad(node.amount) + a2rad(node.maxChildAmount ?? 0)) * tgtScale + 20;
       const ring = getRing(node);
@@ -540,7 +541,7 @@ export class BubbleTree {
       for (const cn of node.children ?? []) {
         const b = getBubble(cn);
         if (!b) continue;
-        layout.$(b).angle = this.shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0) + ao);
+        layout.$(b).angle = shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0) + ao);
         layout.$(b).rad = rad1;
       }
 
@@ -553,7 +554,7 @@ export class BubbleTree {
         const sang = Math.PI * 2 - Math.asin((this.container.clientHeight * 0.5 + srad - siblCut) / effectiveRad2);
         if (sib) {
           layout.$(sib).rad = effectiveRad2;
-          layout.$(sib).angle = this.shortestAngleTo(sib.angle, sang);
+          layout.$(sib).angle = shortestAngleTo(sib.angle, sang);
         }
       }
       if (node.right) {
@@ -562,7 +563,7 @@ export class BubbleTree {
         const sang = Math.asin((this.container.clientHeight * 0.5 + srad - siblCut) / effectiveRad2);
         if (sib) {
           layout.$(sib).rad = effectiveRad2;
-          layout.$(sib).angle = this.shortestAngleTo(sib.angle, sang);
+          layout.$(sib).angle = shortestAngleTo(sib.angle, sang);
         }
       }
 
@@ -603,38 +604,6 @@ export class BubbleTree {
 
     if (!this.currentCenter) this.config.firstNodeCallback?.(node);
     this.currentCenter = node;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Angle helpers (keep rotations on shortest path)
-  // ---------------------------------------------------------------------------
-
-  private unifyAngle(a: number): number {
-    const twopi = Math.PI * 2;
-    while (a >= twopi) a -= twopi;
-    while (a < 0) a += twopi;
-    return a;
-  }
-
-  /**
-   * Returns the shortest signed angular delta from `from` to `to`,
-   * choosing the side of the circle that requires less rotation.
-   *
-   * Without this, a bubble at θ = 350° tweening to θ = 10° would spin
-   * the long way (340° backward) instead of the short way (20° forward).
-   */
-  private shortestAngle(from: number, to: number): number {
-    const twopi = Math.PI * 2;
-    const f = this.unifyAngle(from);
-    const t = this.unifyAngle(to);
-    let sa = t - f;
-    if (sa > Math.PI) sa -= twopi;
-    if (sa < -Math.PI) sa += twopi;
-    return sa;
-  }
-
-  private shortestAngleTo(from: number, to: number): number {
-    return from + this.shortestAngle(from, to);
   }
 
   // ---------------------------------------------------------------------------

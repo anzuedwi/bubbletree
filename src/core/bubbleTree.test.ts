@@ -81,6 +81,41 @@ describe('BubbleTree', () => {
     expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
   });
 
+  describe('read-only state getters', () => {
+    it('returns undefined before setData', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      expect(tree.getCurrentNode()).toBeUndefined();
+      expect(tree.getRoot()).toBeUndefined();
+      expect(tree.getVisibleNodes()).toEqual([]);
+    });
+
+    it('returns the root after setData', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      expect(tree.getRoot()?.label).toBe('Total');
+      expect(tree.getCurrentNode()?.label).toBe('Total');
+    });
+
+    it('lists every visible bubble', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      // After the root view: at minimum the root and its two children must
+      // be on stage (siblings may or may not, depending on layout choice).
+      const labels = tree.getVisibleNodes().map((n) => n.label);
+      expect(labels).toContain('Total');
+      expect(labels).toContain('A');
+      expect(labels).toContain('B');
+    });
+
+    it('looks up nodes by their generated urlToken', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      const root = tree.getRoot()!;
+      expect(tree.getNodeByUrlToken(root.urlToken!)).toBe(root);
+      expect(tree.getNodeByUrlToken('not-a-real-token')).toBeUndefined();
+    });
+  });
+
   it('dispatches a viewchange event when setData first centres a node', () => {
     const container = makeContainer();
     const tree = track(new BubbleTree({ container, data: sampleData }));

@@ -185,6 +185,56 @@ export class BubbleTree extends EventTarget {
   }
 
   // ---------------------------------------------------------------------------
+  // Read-only state
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The node currently centred in the view, or `undefined` before setData()
+   * has run.  This is the library's own clone of the caller's tree, so the
+   * returned object can carry `parent` / `level` / `urlToken` metadata that
+   * the original input did not.
+   */
+  getCurrentNode(): BubbleNode | undefined {
+    return this.currentCenter;
+  }
+
+  /**
+   * The library's owned root node.  Returns `undefined` before setData()
+   * has populated it.  Walk `children` from here to enumerate the whole
+   * cloned tree without poking at private state.
+   */
+  getRoot(): BubbleNode | undefined {
+    return this.treeRoot;
+  }
+
+  /**
+   * The nodes currently visible on screen (bubbles whose `show()` ran and
+   * whose `hide()` has not).  Useful for syncing an external list / table
+   * to whatever the user is looking at.
+   *
+   * Returns a fresh array each call so callers can iterate without
+   * worrying about concurrent mutation, but the BubbleNode objects inside
+   * are shared with the tree — treat them as read-only.
+   */
+  getVisibleNodes(): readonly BubbleNode[] {
+    const result: BubbleNode[] = [];
+    for (const obj of this.displayObjects) {
+      if (obj.kind === DisplayKind.Bubble && obj.visible) {
+        result.push(obj.node);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Look up a node by its generated urlToken.  Returns `undefined` if no
+   * node carries that token.
+   */
+  getNodeByUrlToken(token: string): BubbleNode | undefined {
+    return this.nodesByUrlToken[token];
+  }
+
+  // ---------------------------------------------------------------------------
   // Data initialisation
   // ---------------------------------------------------------------------------
 

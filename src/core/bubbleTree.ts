@@ -588,8 +588,18 @@ export class BubbleTree {
 
     const duration = this.currentCenter === node ? 0 : 1000;
     const tr = new Transitioner(duration);
-    tr.changeLayout(layout);
+
+    // If a transition is still running, supersede it: move its pending
+    // completion callbacks onto the new one (so queued navigations still
+    // fire) and stop it so two transitions never animate the same objects.
+    const previous = this.currentTransition;
+    if (previous?.running) {
+      previous.transferCallbacksTo(tr);
+      previous.stop();
+    }
+
     this.currentTransition = tr;
+    tr.changeLayout(layout);
 
     if (!this.currentCenter) this.config.firstNodeCallback?.(node);
     this.currentCenter = node;

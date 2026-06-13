@@ -85,6 +85,18 @@ export class Transitioner {
   }
 
   /**
+   * Hand off completion callbacks that have not fired yet to a successor
+   * transition. Used when a new transition supersedes this one so that work
+   * queued for "after the current transition" (e.g. a pending URL change)
+   * still runs once the successor finishes instead of being dropped.
+   */
+  transferCallbacksTo(next: Transitioner): void {
+    if (this.completeCallbacks.length === 0) return;
+    next.completeCallbacks.push(...this.completeCallbacks);
+    this.completeCallbacks = [];
+  }
+
+  /**
    * Cancel an in-flight transition without running its completion logic.
    * The next scheduled `tick` sees `running === false` and bails, so no
    * further draws happen on (possibly removed) display objects.

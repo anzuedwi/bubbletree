@@ -16,12 +16,11 @@ import { cssToken } from '../util/css.js';
 import { formatNumber } from '../util/format.js';
 import { hslColor, adjustLightness, adjustSaturation } from '../util/color.js';
 import { amountToRadius, setRadiusBase } from './utils.js';
-import { shortestAngleTo } from './angles.js';
 import { Vector } from './vector.js';
-import { Layout } from './layout.js';
 import { Ring } from './ring.js';
 import { Transitioner } from './transitioner.js';
 import { HistoryManager } from './historyManager.js';
+import { LayoutPlanner, type LayoutPlannerContext } from './layoutPlanner.js';
 import { PlainBubble } from '../bubbles/plainBubble.js';
 import { DonutBubble } from '../bubbles/donutBubble.js';
 import { IconBubble } from '../bubbles/iconBubble.js';
@@ -74,6 +73,9 @@ export class BubbleTree {
 
   /** History / URL manager. */
   private history = new HistoryManager();
+
+  /** Stateless layout maths, called from changeView. */
+  private planner = new LayoutPlanner();
 
   /** Global counter used to generate unique urlTokens. */
   private globalNodeCounter = 0;
@@ -446,148 +448,19 @@ export class BubbleTree {
   // View / layout
   // ---------------------------------------------------------------------------
 
+  /**
+   * Look up the node by token, ask the LayoutPlanner for a target Layout,
+   * then hand that Layout to a Transitioner. Splits cleanly into three
+   * phases: planning (pure maths in LayoutPlanner), supersession (transition
+   * lifecycle), and bookkeeping (currentCenter + first-node callback).
+   */
   private changeView(token: string): void {
-    const nodeByToken = this.nodesByUrlToken[token] ?? null;
-    if (!nodeByToken) return;
+    const requestedNode = this.nodesByUrlToken[token];
+    if (!requestedNode) return;
 
-    const root = this.treeRoot;
-    const o = this.origin;
-    const a2rad = amountToRadius;
-    const layout = new Layout();
-    const getBubble = (n: BubbleNode, keepHidden?: boolean) =>
-      this.getDisplayObject(DisplayKind.Bubble, n, keepHidden) as BaseBubble | undefined;
-    const getRing = (n: BubbleNode) =>
-      this.getDisplayObject(DisplayKind.Ring, n) as Ring | undefined;
+    const { layout, centeredNode } = this.planner.plan(requestedNode, this.plannerContext());
 
-    let node = nodeByToken;
-    const maxRad = Math.min(
-      this.container.clientWidth,
-      this.container.clientHeight,
-    ) * 0.35;
-
-    // Mark everything for hiding; individual getBubble/getRing calls clear the flag
-    for (const obj of this.displayObjects) obj.hideFlag = true;
-
-    if (node === root || (node.parent === root && (node.children?.length ?? 0) < 2)) {
-      // ---- Root-level view ----
-      layout.$(this).bubbleScale = 1.0;
-      layout.$(o).x = this.container.clientWidth * 0.5;
-      layout.$(o).y = this.container.clientHeight * 0.5;
-
-      const parent = getBubble(root);
-      if (!parent) return;
-      if (node !== root) parent.childRotation = -(node.centerAngle ?? 0);
-
-      const rad1 = a2rad(root.amount) + a2rad(root.maxChildAmount ?? 0) + 20;
-      const ring = getRing(root);
-      if (ring) layout.$(ring).rad = rad1;
-
-      for (const cn of root.children ?? []) {
-        const b = getBubble(cn);
-        if (!b) continue;
-        layout.$(b).angle = shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0));
-        layout.$(b).rad = rad1;
-      }
-    } else {
-      // ---- Child-level view ----
-      const origNode = node;
-      if ((node.children?.length ?? 0) < 2) node = node.parent!;
-
-      const tgtScale = maxRad / (a2rad(node.amount) + a2rad(node.maxChildAmount ?? 0) * 2);
-      layout.$(this).bubbleScale = tgtScale;
-
-      const parent = getBubble(node);
-      if (!parent) return;
-      layout.$(parent).angle = shortestAngleTo(parent.angle, 0);
-
-      const rad1 = (a2rad(node.amount) + a2rad(node.maxChildAmount ?? 0)) * tgtScale + 20;
-      const ring = getRing(node);
-      if (ring) layout.$(ring).rad = rad1;
-
-      const grandpa = getBubble(node.parent!);
-      if (grandpa) {
-        grandpa.childRotation = -(node.centerAngle ?? 0);
-        layout.$(grandpa).rad = 0;
-
-        // Collapse all ancestors
-        let ancestor: BaseBubble | undefined = grandpa;
-        while (ancestor?.node.parent) {
-          ancestor = getBubble(ancestor.node.parent, true);
-          if (ancestor) layout.$(ancestor).rad = 0;
-        }
-      }
-
-      const hw = this.container.clientWidth * 0.5;
-      const rad2 = Math.max(
-        hw * 0.8 - tgtScale * (
-          a2rad(node.parent?.amount ?? 0) +
-          a2rad(Math.max(
-            node.amount * 1.15 + (node.maxChildAmount ?? 0) * 1.15,
-            a2rad(node.left?.amount ?? 0) * 0.85,
-            a2rad(node.right?.amount ?? 0) * 0.85,
-          ))
-        ),
-        tgtScale * a2rad(node.parent?.amount ?? 0) * -1 + hw * 0.15,
-      );
-
-      layout.$(o).x = this.container.clientWidth * 0.5 - rad2 - (node !== origNode ? rad1 * 0.35 : 0);
-      layout.$(o).y = this.container.clientHeight * 0.5;
-
-      const parentRing = getRing(node.parent!);
-      if (parentRing) layout.$(parentRing).rad = rad2 + this.container.clientWidth * 0.1;
-      layout.$(parent).rad = rad2 + this.container.clientWidth * 0.1;
-
-      const ao = node !== origNode ? -((origNode.centerAngle ?? 0) + (parent.childRotation ?? 0)) : 0;
-      for (const cn of node.children ?? []) {
-        const b = getBubble(cn);
-        if (!b) continue;
-        layout.$(b).angle = shortestAngleTo(b.angle, (cn.centerAngle ?? 0) + (parent.childRotation ?? 0) + ao);
-        layout.$(b).rad = rad1;
-      }
-
-      // Position siblings along the arc
-      const siblCut = this.container.clientHeight * 0.07;
-      const effectiveRad2 = rad2 + this.container.clientWidth * 0.1;
-      if (node.left) {
-        const sib = getBubble(node.left);
-        const srad = a2rad(node.left.amount) * tgtScale;
-        const sang = Math.PI * 2 - Math.asin((this.container.clientHeight * 0.5 + srad - siblCut) / effectiveRad2);
-        if (sib) {
-          layout.$(sib).rad = effectiveRad2;
-          layout.$(sib).angle = shortestAngleTo(sib.angle, sang);
-        }
-      }
-      if (node.right) {
-        const sib = getBubble(node.right);
-        const srad = a2rad(node.right.amount) * tgtScale;
-        const sang = Math.asin((this.container.clientHeight * 0.5 + srad - siblCut) / effectiveRad2);
-        if (sib) {
-          layout.$(sib).rad = effectiveRad2;
-          layout.$(sib).angle = shortestAngleTo(sib.angle, sang);
-        }
-      }
-
-      node = origNode;
-    }
-
-    // Apply show/hide flags
-    for (const obj of this.displayObjects) {
-      if (obj.hideFlag && obj.visible) {
-        layout.$(obj).alpha = 0;
-        if (obj.kind === DisplayKind.Bubble && (obj.node.level ?? 0) > 1) {
-          layout.$(obj).rad = 0;
-        }
-        layout.hide(obj);
-      } else if (!obj.hideFlag) {
-        layout.$(obj).alpha = 1;
-        if (!obj.visible) {
-          (obj as DisplayObject & { alpha: number }).alpha = 0;
-          layout.show(obj);
-        }
-      }
-    }
-
-    const duration = this.currentCenter === node ? 0 : 1000;
+    const duration = this.currentCenter === centeredNode ? 0 : 1000;
     const tr = new Transitioner(duration);
 
     // If a transition is still running, supersede it: move its pending
@@ -602,8 +475,24 @@ export class BubbleTree {
     this.currentTransition = tr;
     tr.changeLayout(layout);
 
-    if (!this.currentCenter) this.config.firstNodeCallback?.(node);
-    this.currentCenter = node;
+    if (!this.currentCenter) this.config.firstNodeCallback?.(centeredNode);
+    this.currentCenter = centeredNode;
+  }
+
+  /** Build the context bag the LayoutPlanner needs. */
+  private plannerContext(): LayoutPlannerContext {
+    return {
+      width: this.container.clientWidth,
+      height: this.container.clientHeight,
+      origin: this.origin,
+      root: this.treeRoot,
+      displayObjects: this.displayObjects,
+      scaleTarget: this,
+      getBubble: (n, keepHidden) =>
+        this.getDisplayObject(DisplayKind.Bubble, n, keepHidden) as BaseBubble | undefined,
+      getRing: (n) =>
+        this.getDisplayObject(DisplayKind.Ring, n) as Ring | undefined,
+    };
   }
 
   // ---------------------------------------------------------------------------

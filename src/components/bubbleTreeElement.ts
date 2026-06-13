@@ -119,10 +119,22 @@ export class BubbleTreeElement extends LitElement {
     }
   }
 
+  /** Tear down the wrapped tree when the element leaves the DOM. */
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.tree?.destroy();
+    this.tree = null;
+  }
+
   /** Construct a fresh BubbleTree from the current props. */
   private rebuild(): void {
     const container = this.renderRoot.querySelector<HTMLElement>('.bubbletree');
     if (!container || !this.data) return;
+
+    // Release the previous instance's global listeners before replacing it,
+    // otherwise each property change would stack another live tree.
+    this.tree?.destroy();
+    this.tree = null;
 
     // Clone the data so consumers can keep their reference intact;
     // BubbleTree mutates its input by attaching parent/level metadata.

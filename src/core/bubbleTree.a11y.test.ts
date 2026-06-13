@@ -114,4 +114,31 @@ describe('ARIA semantics', () => {
     const leaf = container.querySelector('circle.bubbletree-bubble.a')!;
     expect(leaf.hasAttribute('aria-expanded')).toBe(false);
   });
+
+  describe('live region', () => {
+    it('creates a polite live region in the container', () => {
+      const container = makeContainer();
+      track(new BubbleTree({ container, data: sampleData }));
+      const region = container.querySelector('.bubbletree-announce')!;
+      expect(region).toBeTruthy();
+      expect(region.getAttribute('aria-live')).toBe('polite');
+      expect(region.getAttribute('role')).toBe('status');
+    });
+
+    it('writes the centred node name + amount into the live region', () => {
+      const container = makeContainer();
+      const tree = track(new BubbleTree({ container, data: sampleData }));
+      tree.setData(sampleData);
+      const region = container.querySelector('.bubbletree-announce')!;
+      expect(region.textContent).toContain('Total');
+      expect(region.textContent).toContain('100');
+    });
+
+    it('removes the live region on destroy', () => {
+      const container = makeContainer();
+      const tree = new BubbleTree({ container, data: sampleData });
+      tree.destroy();
+      expect(container.querySelector('.bubbletree-announce')).toBeNull();
+    });
+  });
 });

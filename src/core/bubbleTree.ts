@@ -49,6 +49,13 @@ export class BubbleTree extends EventTarget {
   /** The SVG element used for all circle / path rendering. */
   readonly svg: SVGSVGElement;
 
+  /**
+   * Off-screen live region updated on every viewchange so screen readers
+   * announce the newly centred node. Created in the constructor and
+   * removed on destroy.
+   */
+  private readonly announcer: HTMLDivElement;
+
   /** Current uniform scale applied to all bubble radii. */
   bubbleScale = 1;
 
@@ -108,6 +115,15 @@ export class BubbleTree extends EventTarget {
     this.svg.setAttribute('aria-label', 'Hierarchical bubble tree');
     this.container.prepend(this.svg);
 
+    // Visually-hidden polite live region — screen readers will read out
+    // whatever text we write into it without interrupting other speech.
+    this.announcer = document.createElement('div');
+    this.announcer.className = 'bubbletree-announce';
+    this.announcer.setAttribute('role', 'status');
+    this.announcer.setAttribute('aria-live', 'polite');
+    this.announcer.setAttribute('aria-atomic', 'true');
+    this.container.append(this.announcer);
+
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     this.svg.setAttribute('width', String(w));
@@ -131,6 +147,7 @@ export class BubbleTree extends EventTarget {
     this.history.destroy();
     this.currentTransition?.stop();
     this.currentTransition = undefined;
+    this.announcer.remove();
   }
 
   // ---------------------------------------------------------------------------
@@ -556,10 +573,22 @@ export class BubbleTree extends EventTarget {
     this.currentCenter = centeredNode;
     if (previousCenter !== centeredNode) {
       this.updateAriaExpanded(centeredNode);
+      this.announce(centeredNode);
       this.dispatchEvent(
         new ViewChangeEvent({ node: centeredNode, previous: previousCenter }),
       );
     }
+  }
+
+  /**
+   * Write a description of the centred node into the polite live region.
+   * Assistive tech will queue the text and read it after current speech
+   * finishes, so rapid hash-driven navigations announce only the latest.
+   */
+  private announce(node: BubbleNode): void {
+    const label = node.label ?? node.name ?? 'Unnamed node';
+    const amount = this.config.formatValue(node.amount);
+    this.announcer.textContent = `Now showing ${label}, ${amount}`;
   }
 
   /**

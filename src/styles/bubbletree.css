@@ -82,6 +82,25 @@
     background: #fff;
     container-type: size;
   }
+
+  /*
+   * Visually-hidden live region. Stays in the accessibility tree so screen
+   * readers pick up updates, but invisible to sighted users. Uses the
+   * pattern recommended by WebAIM (https://webaim.org/techniques/css/invisiblecontent/):
+   * 1px clipped square in the page corner with no transform side effects.
+   */
+  .bubbletree-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -21,6 +21,7 @@ import { Vector } from './vector.js';
 import { Ring } from './ring.js';
 import { Transitioner } from './transitioner.js';
 import { HistoryManager } from './historyManager.js';
+import { KeyboardNavigator } from './keyboardNavigator.js';
 import { LayoutPlanner, type LayoutPlannerContext } from './layoutPlanner.js';
 import { PlainBubble } from '../bubbles/plainBubble.js';
 import { DonutBubble } from '../bubbles/donutBubble.js';
@@ -86,6 +87,9 @@ export class BubbleTree extends EventTarget {
   /** Stateless layout maths, called from changeView. */
   private planner = new LayoutPlanner();
 
+  /** Keyboard navigation handler. Lazily created after the SVG exists. */
+  private keyboard: KeyboardNavigator;
+
   /** Global counter used to generate unique urlTokens. */
   private globalNodeCounter = 0;
 
@@ -131,6 +135,11 @@ export class BubbleTree extends EventTarget {
 
     this.origin = new Vector(w * 0.5, h * 0.5);
 
+    // The roving-tabindex pattern puts tabindex=0 on exactly one treeitem
+    // (the centred node) so Tab lands directly on it from the surrounding
+    // page. The SVG itself stays unfocusable.
+    this.keyboard = new KeyboardNavigator(this);
+
     window.addEventListener('resize', this.boundResize);
   }
 
@@ -147,6 +156,7 @@ export class BubbleTree extends EventTarget {
     this.history.destroy();
     this.currentTransition?.stop();
     this.currentTransition = undefined;
+    this.keyboard.destroy();
     this.announcer.remove();
   }
 
@@ -253,6 +263,19 @@ export class BubbleTree extends EventTarget {
    */
   getNodeByUrlToken(token: string): BubbleNode | undefined {
     return this.nodesByUrlToken[token];
+  }
+
+  /**
+   * Every bubble owned by the tree (visible or not). Returns the live
+   * array, not a copy, so callers must treat it as read-only.
+   *
+   * Intended for tightly-coupled collaborators such as KeyboardNavigator;
+   * application code should prefer getVisibleNodes() or getRoot().
+   */
+  getBubbles(): readonly BaseBubble[] {
+    return this.displayObjects.filter(
+      (o) => o.kind === DisplayKind.Bubble,
+    ) as unknown as readonly BaseBubble[];
   }
 
   // ---------------------------------------------------------------------------
@@ -574,6 +597,10 @@ export class BubbleTree extends EventTarget {
     if (previousCenter !== centeredNode) {
       this.updateAriaExpanded(centeredNode);
       this.announce(centeredNode);
+      // Keep the roving tabindex on the centred node so subsequent Tabs
+      // from outside land on it; do not focus() here, that would steal
+      // focus from whatever the user was interacting with.
+      this.keyboard.syncTo(centeredNode);
       this.dispatchEvent(
         new ViewChangeEvent({ node: centeredNode, previous: previousCenter }),
       );

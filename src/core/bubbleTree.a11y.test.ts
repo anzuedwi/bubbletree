@@ -72,9 +72,12 @@ describe('ARIA semantics', () => {
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
       expect(c.getAttribute('role')).toBe('treeitem');
-      expect(c.getAttribute('tabindex')).toBe('-1');
+      // Roving tabindex: exactly one circle is 0, all others are -1.
+      expect(['0', '-1']).toContain(c.getAttribute('tabindex'));
       expect(c.getAttribute('aria-level')).toBeTruthy();
     }
+    const focusable = container.querySelectorAll('circle.bubbletree-bubble[tabindex="0"]');
+    expect(focusable.length).toBe(1);
   });
 
   it('sets aria-level matching node depth (1-indexed)', () => {

@@ -121,6 +121,7 @@
         cx var(--bt-transition-duration) var(--bt-transition-easing),
         cy var(--bt-transition-duration) var(--bt-transition-easing),
         fill-opacity var(--bt-transition-duration) ease;
+      outline: none;
 
       &:hover {
         filter: brightness(1.12);
@@ -128,6 +129,17 @@
 
       &[style*="cursor: pointer"]:active {
         filter: brightness(0.9) saturate(1.2);
+      }
+
+      /*
+       * Keyboard focus indicator. :focus-visible only matches when the
+       * browser determines the focus came from keyboard navigation (Tab,
+       * arrow keys), so mouse clicks don't get an outline.
+       */
+      &:focus-visible {
+        stroke: #0066cc;
+        stroke-width: 3;
+        filter: drop-shadow(0 0 4px rgba(0 102 204 / 0.6));
       }
     }
 

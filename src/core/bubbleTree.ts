@@ -215,6 +215,160 @@ export class BubbleTree extends EventTarget {
     cb?.(event);
   }
 
+  /**
+   * Update an already-loaded tree to a new dataset, animating the changes
+   * in place instead of tearing the visualisation down and rebuilding it.
+   *
+   * What it does
+   * ────────────
+   *  - Deep-clones the input (so the caller's data is never mutated).
+   *  - Matches old nodes to new ones by stable key: `id` first, then the
+   *    generated `urlToken` (which is derived from `label`).
+   *  - Matched bubbles keep their identity and animate to the new
+   *    amount / radius / colour / sort position.
+   *  - Unmatched new nodes get fresh bubbles that fade in at the next
+   *    layout pass.
+   *  - Unmatched old bubbles are hidden and dropped from the display list.
+   *  - The currently-centred view is preserved when possible; if the
+   *    centred node was removed the view falls back to the new root.
+   *
+   * Limitations
+   * ───────────
+   *  - Trees without stable `id` or `label` fields will be treated as full
+   *    replacements (matching falls through to "no match").
+   *  - Renaming a node simultaneously with a structural change can
+   *    confuse the matcher; either rename in one pass and restructure in
+   *    the next, or supply stable `id` fields up front.
+   */
+  updateData(newData: BubbleNode): void {
+    if (!this.treeRoot) {
+      // No data loaded yet — treat as a regular initial load.
+      this.setData(newData);
+      return;
+    }
+
+    // Stop any running transition before we mutate displayObjects, so the
+    // previous tick can't draw against a bubble we are about to remove.
+    this.currentTransition?.stop();
+    this.currentTransition = undefined;
+
+    const newRoot = this.annotateNewTree(newData);
+    const newKeyToNode = this.indexByKey(newRoot);
+    const matched = this.rebindExistingDisplayObjects(newKeyToNode);
+    this.dropUnmatchedDisplayObjects(newKeyToNode);
+
+    this.treeRoot = newRoot;
+    this.resizePaper();
+    this.createMissingDisplayObjects(newRoot, matched);
+
+    // Migrate currentCenter onto its equivalent in the new tree (or drop it
+    // entirely if that node no longer exists).
+    const previousCenter = this.currentCenter;
+    if (previousCenter) {
+      this.currentCenter = newKeyToNode.get(BubbleTree.matchKey(previousCenter));
+    }
+
+    // Force a fresh layout pass even if the centred node URL is unchanged.
+    const targetToken = this.currentCenter?.urlToken ?? newRoot.urlToken!;
+    this.currentCenter = undefined;
+    this.changeView(targetToken);
+  }
+
+  // ---------------------------------------------------------------------------
+  // updateData internals
+  // ---------------------------------------------------------------------------
+
+  /** Clone newData and re-run the traversal pipeline on the copy. */
+  private annotateNewTree(newData: BubbleNode): BubbleNode {
+    const copy = structuredClone(newData);
+    // Reset the per-traversal state used by traverse() so the new tree gets
+    // its own fresh annotations rather than stacking on the old run's.
+    this.nodesByUrlToken = {};
+    this.globalNodeCounter = 0;
+    copy.level = 0;
+    this.preprocessData(copy);
+    this.traverse(copy, 0);
+    return copy;
+  }
+
+  /**
+   * The key used to match old display objects against new nodes. Prefer
+   * `id` (caller-supplied, stable across renames), fall back to the
+   * library-generated urlToken (stable if the label doesn't change), and
+   * finally to the label itself. Returns empty string when nothing matches.
+   */
+  private static matchKey(node: BubbleNode): string {
+    return node.id ?? node.urlToken ?? node.label ?? '';
+  }
+
+  /** Build a key→node lookup for every node in the new tree. */
+  private indexByKey(root: BubbleNode): Map<string, BubbleNode> {
+    const index = new Map<string, BubbleNode>();
+    const visit = (node: BubbleNode) => {
+      const key = BubbleTree.matchKey(node);
+      if (key) index.set(key, node);
+      for (const child of node.children ?? []) visit(child);
+    };
+    visit(root);
+    return index;
+  }
+
+  /**
+   * Rebind every existing display object's `node` reference to its new-tree
+   * equivalent. Returns the set of new nodes that got rebound (used in the
+   * subsequent createMissing pass to know which ones still need fresh
+   * bubbles).
+   */
+  private rebindExistingDisplayObjects(
+    newKeyToNode: Map<string, BubbleNode>,
+  ): Set<BubbleNode> {
+    const matched = new Set<BubbleNode>();
+    for (const obj of this.displayObjects) {
+      const newNode = newKeyToNode.get(BubbleTree.matchKey(obj.node));
+      if (!newNode) continue;
+      obj.node = newNode;
+      if (obj.kind === DisplayKind.Bubble) {
+        obj.bubbleRad = amountToRadius(newNode.amount);
+      }
+      matched.add(newNode);
+    }
+    return matched;
+  }
+
+  /** Remove and hide every display object that has no match in the new tree. */
+  private dropUnmatchedDisplayObjects(newKeyToNode: Map<string, BubbleNode>): void {
+    const kept: DisplayObject[] = [];
+    for (const obj of this.displayObjects) {
+      const survived = newKeyToNode.has(BubbleTree.matchKey(obj.node));
+      if (survived) {
+        kept.push(obj);
+      } else {
+        // Hide before dropping so any DOM nodes the object owns are removed.
+        if (obj.visible) obj.hide();
+      }
+    }
+    this.displayObjects = kept;
+  }
+
+  /**
+   * Walk the new tree and create a bubble (and ring, if it has children)
+   * for every node that didn't get rebound from an existing object.
+   */
+  private createMissingDisplayObjects(node: BubbleNode, matched: Set<BubbleNode>): void {
+    if (!matched.has(node)) {
+      this.createBubble(node, this.origin, 0, node.centerAngle ?? 0);
+    }
+    if ((node.children?.length ?? 0) > 0) {
+      const hasRing = this.displayObjects.some(
+        (o) => o.kind === DisplayKind.Ring && o.node === node,
+      );
+      if (!hasRing) this.createRing(node, this.origin);
+    }
+    for (const child of node.children ?? []) {
+      this.createMissingDisplayObjects(child, matched);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Read-only state
   // ---------------------------------------------------------------------------

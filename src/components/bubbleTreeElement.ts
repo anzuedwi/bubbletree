@@ -102,24 +102,31 @@ export class BubbleTreeElement extends LitElement {
 
   /**
    * Lit lifecycle: fires after the first render *and* after every reactive
-   * update.  We tear down and rebuild the BubbleTree only when something
-   * structural changed; cheap attribute flips don't require a rebuild but
-   * the library doesn't currently expose live reconfiguration, so we
-   * rebuild any time a reactive property changes.
+   * update.
+   *
+   * When only `data` changes, prefer the in-place updateData() path so
+   * bubble identity (and animation continuity) is preserved. For any
+   * structural / configuration change we still rebuild — the underlying
+   * BubbleTree treats those as constructor-time concerns.
    */
   protected updated(changed: PropertyValues): void {
     if (!this.data) return;
-    if (
-      changed.has('data') ||
+
+    const structuralChange =
       changed.has('bubbleType') ||
       changed.has('bubbleStyles') ||
       changed.has('autoColors') ||
       changed.has('clearColors') ||
       changed.has('minRadiusLabels') ||
       changed.has('minRadiusAmounts') ||
-      changed.has('cutLabelsAt')
-    ) {
+      changed.has('cutLabelsAt');
+
+    if (structuralChange || !this.tree) {
       this.rebuild();
+    } else if (changed.has('data')) {
+      // Data-only change: hand it to the live tree so matched nodes animate
+      // their amount/radius instead of being torn down and recreated.
+      this.tree.updateData(this.data);
     }
   }
 

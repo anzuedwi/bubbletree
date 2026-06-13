@@ -52,9 +52,6 @@ export class BubbleTree {
   /** Every display object (bubbles + rings) ever created for this tree. */
   private displayObjects: DisplayObject[] = [];
 
-  /** Flat list of every data node (populated during traversal). */
-  private nodeList: BubbleNode[] = [];
-
   /** Fast lookup: urlToken → node. */
   private nodesByUrlToken: Record<string, BubbleNode> = {};
 
@@ -219,7 +216,6 @@ export class BubbleTree {
   private traverse(node: BubbleNode, index: number): void {
     if (!node.children) node.children = [];
 
-    this.nodeList.push(node);
     node.famount = this.config.formatValue(node.amount);
 
     if (node.parent) node.level = (node.parent.level ?? 0) + 1;

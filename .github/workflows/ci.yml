@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Continuous Integration
+#
+# Validates everything we run locally before merging.  Each job is its own
+# unit of work so the GitHub status checks tell you exactly which step
+# failed without forcing you to re-run the others.
+#
+#   typecheck  → tsc --noEmit (whole project, including stories and tests)
+#   test       → vitest run + v8 coverage  (uploaded as a workflow artifact)
+#   build      → vite build + tsc -p tsconfig.build.json (uploaded as dist/)
+#   storybook  → storybook build (validates every story compiles)
+#
+# Triggers: every push and every pull request.  An in-flight run is cancelled
+# when a newer commit lands on the same branch (concurrency block below).
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+# Cancel duplicate runs on the same ref so force-pushes don't pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Static analysis — TypeScript strict-mode typecheck of the whole project.
+  # ───────────────────────────────────────────────────────────────────────────
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Unit + component tests with coverage.  Uses happy-dom for the DOM-bound
+  # suites; rAF is stubbed inside the tests to drive transitions to completion
+  # synchronously.
+  # ───────────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (Vitest + coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Library build — Vite bundle + .d.ts declarations.  Catches problems that
+  # only surface in the production build (e.g. tree-shaking, cyclic imports,
+  # declaration emit conflicts).
+  # ───────────────────────────────────────────────────────────────────────────
+  build:
+    name: Library build (Vite + tsc declarations)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload built library
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Storybook static build — proves every story compiles and every addon
+  # resolves.  Uploaded so reviewers can drag-drop the artifact into a static
+  # server to preview the visualisations without checking out the branch.
+  # ───────────────────────────────────────────────────────────────────────────
+  storybook:
+    name: Storybook build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Upload Storybook static site
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-static
+          path: storybook-static/
+          if-no-files-found: error
+          retention-days: 14

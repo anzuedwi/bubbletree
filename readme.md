@@ -2,6 +2,8 @@
 
 > Interactive radial visualisation of hierarchical data.
 
+[![CI](https://github.com/anzuedwi/bubbletree/actions/workflows/ci.yml/badge.svg)](https://github.com/anzuedwi/bubbletree/actions/workflows/ci.yml)
+
 BubbleTree is a small TypeScript library that renders nested data as a tree
 of concentric rings of bubbles.  Originally built for OpenSpending; the
 3.x rewrite drops jQuery / RaphaelJS / Tween.js entirely in favour of
@@ -70,6 +72,21 @@ npm run test:coverage    # v8 coverage report
 npm run storybook        # Storybook on :6006
 npm run build-storybook  # static Storybook into storybook-static/
 ```
+
+## Continuous integration
+
+Every push and pull request runs `.github/workflows/ci.yml`, which fans out
+into four independent jobs so a failure pinpoints the exact stage:
+
+| Job          | Command                          | Artifact uploaded     |
+|--------------|----------------------------------|-----------------------|
+| `typecheck`  | `npx tsc --noEmit`               | —                     |
+| `test`       | `npx vitest run --coverage`      | `coverage-report`     |
+| `build`      | `npm run build`                  | `dist`                |
+| `storybook`  | `npm run build-storybook`        | `storybook-static`    |
+
+Runs are cancellable: a newer commit on the same ref cancels any
+in-flight run via a `concurrency` group.
 
 ## What changed in 3.0
 

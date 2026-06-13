@@ -81,6 +81,17 @@ describe('BubbleTree', () => {
     expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
   });
 
+  it('dispatches a viewchange event when setData first centres a node', () => {
+    const container = makeContainer();
+    const tree = track(new BubbleTree({ container, data: sampleData }));
+    const events: CustomEvent[] = [];
+    tree.addEventListener('viewchange', (e) => events.push(e as CustomEvent));
+    tree.setData(sampleData);
+    expect(events.length).toBe(1);
+    expect(events[0]!.detail.node.label).toBe('Total');
+    expect(events[0]!.detail.previous).toBeNull();
+  });
+
   it('does not mutate the caller-supplied data tree', () => {
     const container = makeContainer();
     const input: BubbleNode = {

@@ -31,6 +31,7 @@ import { DisplayKind } from '../enums/displayKind.js';
 import type { BubbleConfig, ResolvedBubbleConfig } from '../types/bubbleConfig.js';
 import type { BubbleNode } from '../types/bubbleNode.js';
 import type { BubbleStyleEntry } from '../types/bubbleStyle.js';
+import { ViewChangeEvent } from '../types/viewChangeEvent.js';
 import type { DisplayObject } from '../types/displayObject.js';
 import type { TooltipEvent } from '../types/tooltipEvent.js';
 import type { BaseBubble } from '../bubbles/baseBubble.js';
@@ -38,7 +39,7 @@ import type { BaseBubble } from '../bubbles/baseBubble.js';
 /** Union of concrete bubble constructors so we can instantiate by level. */
 type BubbleClass = typeof PlainBubble | typeof DonutBubble | typeof IconBubble;
 
-export class BubbleTree {
+export class BubbleTree extends EventTarget {
   /** Resolved configuration with all defaults filled in. */
   readonly config: ResolvedBubbleConfig;
 
@@ -94,6 +95,7 @@ export class BubbleTree {
   private destroyed = false;
 
   constructor(config: BubbleConfig) {
+    super();
     this.config = this.resolveConfig(config);
     this.container = resolveContainer(config.container);
     this.container.classList.add('bubbletree');
@@ -492,7 +494,17 @@ export class BubbleTree {
     tr.changeLayout(layout);
 
     if (!this.currentCenter) this.config.firstNodeCallback?.(centeredNode);
+
+    // Only fire the viewchange event when the centred node actually changes;
+    // re-centring on the same node (same-node URL navigation) is a no-op
+    // from the consumer's perspective.
+    const previousCenter = this.currentCenter ?? null;
     this.currentCenter = centeredNode;
+    if (previousCenter !== centeredNode) {
+      this.dispatchEvent(
+        new ViewChangeEvent({ node: centeredNode, previous: previousCenter }),
+      );
+    }
   }
 
   /** Build the context bag the LayoutPlanner needs. */

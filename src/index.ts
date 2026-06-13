@@ -31,6 +31,11 @@ export type { BubbleNode } from './types/bubbleNode.js';
 export type { BubbleStyles, BubbleStyleEntry } from './types/bubbleStyle.js';
 export type { Breakdown } from './types/breakdown.js';
 export type { TooltipEvent, TooltipCallback } from './types/tooltipEvent.js';
+export {
+  ViewChangeEvent,
+  VIEW_CHANGE_EVENT,
+  type ViewChangeEventDetail,
+} from './types/viewChangeEvent.js';
 export type { DisplayObject } from './types/displayObject.js';
 export type { Point } from './types/point.js';
 

@@ -25,6 +25,10 @@ import type { BubbleConfig } from '../types/bubbleConfig.js';
 import type { BubbleNode } from '../types/bubbleNode.js';
 import type { BubbleStyles } from '../types/bubbleStyle.js';
 import type { TooltipEvent } from '../types/tooltipEvent.js';
+import {
+  VIEW_CHANGE_EVENT,
+  type ViewChangeEventDetail,
+} from '../types/viewChangeEvent.js';
 
 @customElement('bubble-tree')
 export class BubbleTreeElement extends LitElement {
@@ -159,6 +163,16 @@ export class BubbleTreeElement extends LitElement {
     };
 
     this.tree = new BubbleTree(config);
+    // Re-dispatch viewchange events from the host element so consumers can
+    // listen with <bubble-tree>.addEventListener('viewchange', …).
+    this.tree.addEventListener(VIEW_CHANGE_EVENT, (event) => {
+      this.dispatchEvent(
+        new CustomEvent<ViewChangeEventDetail>(VIEW_CHANGE_EVENT, {
+          detail: (event as CustomEvent<ViewChangeEventDetail>).detail,
+          bubbles: true,
+        }),
+      );
+    });
     this.tree.setData(this.data);
   }
 }

@@ -18,6 +18,7 @@ import { Vector } from '../core/vector.js';
 import { MouseEventGroup } from '../core/mouseEventGroup.js';
 import { amountToRadius } from '../core/utils.js';
 import { createSvgElement, createDiv } from '../util/dom.js';
+import { cssToken } from '../util/css.js';
 import { DisplayKind } from '../enums/displayKind.js';
 import { TooltipEventType } from '../enums/tooltipEventType.js';
 import type { BubbleTree } from '../core/bubbleTree.js';
@@ -77,7 +78,8 @@ export abstract class BaseBubble implements DisplayObject {
     circle.setAttribute('cy', String(this.pos.y));
     circle.setAttribute('r', String(radius));
     circle.setAttribute('fill', this.color);
-    if (this.node.id) circle.classList.add(this.node.id);
+    const token = cssToken(this.node.id);
+    if (token) circle.classList.add(token);
     return circle;
   }
 
@@ -94,7 +96,7 @@ export abstract class BaseBubble implements DisplayObject {
   }
 
   protected createPrimaryLabel(): HTMLDivElement {
-    const label = createDiv(`bubbletree-label ${this.node.id ?? ''}`);
+    const label = createDiv(['bubbletree-label', cssToken(this.node.id)].filter(Boolean).join(' '));
     const amount = createDiv('bubbletree-amount');
     amount.textContent = this.tree.config.formatValue(this.node.amount);
     const desc = createDiv('bubbletree-desc');
@@ -104,7 +106,7 @@ export abstract class BaseBubble implements DisplayObject {
   }
 
   protected createSecondaryLabel(): HTMLDivElement {
-    const label = createDiv(`bubbletree-label2 ${this.node.id ?? ''}`);
+    const label = createDiv(['bubbletree-label2', cssToken(this.node.id)].filter(Boolean).join(' '));
     const span = document.createElement('span');
     span.textContent = this.node.shortLabel ?? '';
     label.append(span);

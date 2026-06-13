@@ -12,6 +12,7 @@
  */
 
 import { createSvgElement, resolveContainer } from '../util/dom.js';
+import { cssToken } from '../util/css.js';
 import { formatNumber } from '../util/format.js';
 import { hslColor, adjustLightness, adjustSaturation } from '../util/color.js';
 import { amountToRadius, setRadiusBase } from './utils.js';
@@ -144,8 +145,11 @@ export class BubbleTree {
     // Highlight matching overlay labels
     this.container.querySelectorAll('.bubbletree-label.current, .bubbletree-label2.current')
       .forEach((el) => el.classList.remove('current'));
-    if (node.id) {
-      this.container.querySelectorAll(`.bubbletree-label.${node.id}, .bubbletree-label2.${node.id}`)
+    // Use the same token transform as the label elements so the selector and
+    // the tagged class always agree (and never produce an invalid selector).
+    const token = cssToken(node.id);
+    if (token) {
+      this.container.querySelectorAll(`.bubbletree-label.${token}, .bubbletree-label2.${token}`)
         .forEach((el) => el.classList.add('current'));
     }
   }

@@ -228,7 +228,7 @@ export class BubbleTree {
     if (node.parent) node.level = (node.parent.level ?? 0) + 1;
 
     // Apply colour clearing
-    if (this.config.clearColors) node.color = false;
+    if (this.config.clearColors) node.color = undefined;
 
     // Apply styles from config
     this.applyBubbleStyles(node, index);
@@ -240,7 +240,7 @@ export class BubbleTree {
 
     // Desaturate leaf nodes slightly
     if ((node.children.length < 2) && node.color) {
-      node.color = adjustSaturation(node.color as string, 0.86);
+      node.color = adjustSaturation(node.color, 0.86);
     }
 
     // Wire up left / right siblings for orbital navigation
@@ -336,11 +336,11 @@ export class BubbleTree {
         return hslColor((index / count) * 360, 0.7, 0.5);
       }
       // Vary lightness from parent colour
-      const parentColor = (node.parent?.color as string) ?? '#999';
+      const parentColor = node.parent?.color ?? '#999';
       return adjustLightness(parentColor, 0.5 + Math.random() * 0.5);
     }
     // Inherit parent colour or fall back to neutral grey
-    if (level > 0 && node.parent?.color) return node.parent.color as string;
+    if (level > 0 && node.parent?.color) return node.parent.color;
     return '#999999';
   }
 
@@ -430,7 +430,7 @@ export class BubbleTree {
     let classIndex = Math.min(node.level ?? 0, this.bubbleClasses.length - 1);
     if (isNaN(classIndex)) classIndex = 0;
     const BubbleClass = this.bubbleClasses[classIndex]!;
-    const bubble = new BubbleClass(node, this, origin, rad, angle, (node.color as string) ?? '#999');
+    const bubble = new BubbleClass(node, this, origin, rad, angle, node.color ?? '#999');
     this.displayObjects.push(bubble);
     return bubble;
   }

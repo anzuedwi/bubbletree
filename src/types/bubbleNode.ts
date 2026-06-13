@@ -15,7 +15,12 @@ export interface BubbleNode {
   shortLabel?: string;
   amount: number;
   famount?: string;
-  color?: string | false;
+  /**
+   * Bubble fill colour. Use `undefined` (or omit) to inherit from the
+   * parent or auto-assigned palette; do not use `false` to clear it —
+   * the library handles colour clearing through `BubbleConfig.clearColors`.
+   */
+  color?: string;
   icon?: string;
   token?: string;
   taxonomy?: string;

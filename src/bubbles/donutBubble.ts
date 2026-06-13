@@ -18,7 +18,11 @@ import type { Point } from '../types/point.js';
 
 export class DonutBubble extends BaseBubble {
   private breakdown: number[] = [];
-  private breakdownColors: Array<string | false> = [];
+  /**
+   * Per-slice colour override.  `undefined` means "use the default
+   * (white) fill"; a hex string is used verbatim.
+   */
+  private breakdownColors: Array<string | undefined> = [];
   private breakdownOpacities: number[] = [0.2, 0.7, 0.45, 0.6, 0.35];
   private breakdownArcs: SVGPathElement[] = [];
 
@@ -38,7 +42,7 @@ export class DonutBubble extends BaseBubble {
     const styles = this.tree.config.bubbleStyles;
     const breakdowns = this.node.breakdowns ?? [];
     this.breakdown = [];
-    this.breakdownColors = new Array(breakdowns.length).fill(false);
+    this.breakdownColors = new Array<string | undefined>(breakdowns.length).fill(undefined);
 
     for (let i = 0; i < breakdowns.length; i++) {
       const b = breakdowns[i]!;
@@ -81,7 +85,7 @@ export class DonutBubble extends BaseBubble {
       this.breakdownArcs = this.breakdown.map((_, i) => {
         const arc = createSvgElement('path');
         arc.classList.add('bubbletree-arc');
-        arc.setAttribute('fill', (this.breakdownColors[i] || '#fff') as string);
+        arc.setAttribute('fill', this.breakdownColors[i] ?? '#fff');
         arc.setAttribute('stroke', '#fff');
         this.tree.svg.append(arc);
         arc.addEventListener('click', () => {

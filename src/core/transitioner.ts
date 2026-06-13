@@ -84,6 +84,17 @@ export class Transitioner {
     this.completeCallbacks.push(callback);
   }
 
+  /**
+   * Cancel an in-flight transition without running its completion logic.
+   * The next scheduled `tick` sees `running === false` and bails, so no
+   * further draws happen on (possibly removed) display objects.
+   */
+  stop(): void {
+    this.running = false;
+    this.layout = null;
+    this.completeCallbacks = [];
+  }
+
   private completed(): void {
     this.running = false;
     if (!this.layout) return;

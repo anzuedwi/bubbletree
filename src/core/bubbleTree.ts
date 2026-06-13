@@ -85,6 +85,12 @@ export class BubbleTree {
   /** Most-recently received hash, used to detect stale navigations. */
   private freshUrl = '';
 
+  /** Stable reference to the resize handler so it can be removed on destroy. */
+  private readonly boundResize = this.onResize.bind(this);
+
+  /** Guards against using the instance after destroy(). */
+  private destroyed = false;
+
   constructor(config: BubbleConfig) {
     this.config = this.resolveConfig(config);
     this.container = resolveContainer(config.container);
@@ -101,7 +107,22 @@ export class BubbleTree {
 
     this.origin = new Vector(w * 0.5, h * 0.5);
 
-    window.addEventListener('resize', this.onResize.bind(this));
+    window.addEventListener('resize', this.boundResize);
+  }
+
+  /**
+   * Release every external resource this instance owns: the window resize
+   * listener, the hashchange listener (via HistoryManager), and any running
+   * transition. Safe to call more than once. After destroy() the instance
+   * must not be reused.
+   */
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    window.removeEventListener('resize', this.boundResize);
+    this.history.destroy();
+    this.currentTransition?.stop();
+    this.currentTransition = undefined;
   }
 
   // ---------------------------------------------------------------------------
@@ -350,6 +371,10 @@ export class BubbleTree {
   }
 
   private onResize(): void {
+    // Ignore resize events that arrive after teardown or before data has
+    // been loaded (the resize listener is registered in the constructor,
+    // but treeRoot is not populated until setData()).
+    if (this.destroyed || !this.treeRoot) return;
     this.resizePaper();
     if (this.currentCenter) this.changeView(this.currentCenter.urlToken ?? '');
   }

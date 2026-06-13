@@ -46,6 +46,10 @@ describe('<bubble-legend>', () => {
   it('uses the swatch color', async () => {
     const el = await mount({ entries: [{ label: 'Red', color: '#ff0000' }] });
     const swatch = el.shadowRoot!.querySelector('.swatch') as HTMLElement;
-    expect(swatch.style.background).toContain('rgb(255, 0, 0)');
+    // Different DOM implementations normalise colours differently (a real
+    // browser yields rgb(...), happy-dom preserves the hex), so assert the
+    // colour is applied rather than a specific serialisation.
+    const applied = swatch.style.background.toLowerCase();
+    expect(applied === '#ff0000' || applied === 'rgb(255, 0, 0)').toBe(true);
   });
 });

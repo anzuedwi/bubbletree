@@ -22,7 +22,7 @@
     "src"
   ],
   "scripts": {
-    "build": "vite build && tsc --emitDeclarationOnly",
+    "build": "vite build && tsc -p tsconfig.build.json",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

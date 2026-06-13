@@ -1,44 +1,113 @@
-Radial Bubble Tree
-==================
+# BubbleTree
 
-![bubble tree screenshot](http://driven-by-data.net/wp/wp-content/uploads/2011/06/Bildschirmfoto-2011-07-02-um-23.02.50.png bubbletree screenshot right)
+> Interactive radial visualisation of hierarchical data.
 
-**BubbleTree** is a library for interactive visualization of hierarchical data. Originally developed mainly for [spending data](http://openspending.org), the library is now completely independent from the OpenSpending platform. BubbleTree is built on top of [jQuery](http://jquery.com) and [RaphaelJS](http://raphaeljs.com/).
+[![CI](https://github.com/anzuedwi/bubbletree/actions/workflows/ci.yml/badge.svg)](https://github.com/anzuedwi/bubbletree/actions/workflows/ci.yml)
 
-## Documentation
+BubbleTree is a small TypeScript library that renders nested data as a tree
+of concentric rings of bubbles.  Originally built for OpenSpending; the
+3.x rewrite drops jQuery / RaphaelJS / Tween.js entirely in favour of
+TypeScript, native SVG, the Web Animations API, and modern CSS
+(`@layer`, nesting, custom properties).
 
-Please refer to the docs in the [wiki pages](https://github.com/okfn/bubbletree/wiki/Bubble-Tree-Documentation).
+```ts
+import { BubbleTree } from 'bubbletree';
+import 'bubbletree/style.css';
 
-## Copyright and License
+new BubbleTree({
+  container: '#chart',
+  data: {
+    label: 'Total',
+    amount: 100,
+    children: [
+      { label: 'A', amount: 30 },
+      { label: 'B', amount: 70 },
+    ],
+  },
+});
+```
 
-Copyright (c) 2011,2012 Open Knowledge Foundation
+## Web components
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+For declarative use, import the component bundle and use the custom
+elements directly:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+```html
+<bubble-breadcrumbs target="#tree"></bubble-breadcrumbs>
+<bubble-tree id="tree" auto-colors></bubble-tree>
+<bubble-tooltip target="#tree"></bubble-tooltip>
+<bubble-legend></bubble-legend>
+```
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```ts
+import 'bubbletree/components';
+```
 
-## Attribution Request
+## Repository layout
 
-If you use Bubbletree to make a visualization we'd love it (but it's not required!) if you added a small credit text and link e.g.
+```
+src/
+  core/        BubbleTree engine + animation + history
+  bubbles/     Plain / Donut / Icon renderers
+  components/  Web-component wrappers (Lit)
+  types/       Interfaces — one per concept
+  enums/       Enums — one per concept
+  util/        Pure helpers (color, dom, format)
+  styles/      CSS source (@layer + nesting)
+  stories/     Storybook stories + sample datasets
+  __tests__/   Cross-cutting tests
+```
 
-    Built with <a href="http://okfn.org/">Open Knowledge Foundation's</a> <a href="https://github.com/okfn/bubbletree">Bubbletree library</a>
+Each directory contains its own README explaining its conventions.
 
-## Authors
+## Scripts
 
-[Gregor Aisch](http://vis4.net/blog/) with a very small amount of input from [Rufus Pollock](http://rufuspollock.org/) as part of work on the [OpenSpending](http://openspending.org/) project and with financial support from [Publish What You Fund](http://www.publishwhatyoufund.org/) and the [Shuttleworth Foundation](http://www.shuttleworthfoundation.org/).
+```bash
+npm run build            # build dist/bubbletree.js + bubbletree.css + components.js
+npm run dev              # Vite dev server
+npm run typecheck        # tsc --noEmit
+npm test                 # one-shot Vitest run
+npm run test:watch       # watch mode
+npm run test:coverage    # v8 coverage report
+npm run storybook        # Storybook on :6006
+npm run build-storybook  # static Storybook into storybook-static/
+```
 
-## Useful commands
+## Continuous integration
 
-* `npm run build` to rebuild library and demos
-* `npm run review` to check code style 
+Every push and pull request runs `.github/workflows/ci.yml`, which fans out
+into four independent jobs so a failure pinpoints the exact stage:
 
+| Job          | Command                          | Artifact uploaded     |
+|--------------|----------------------------------|-----------------------|
+| `typecheck`  | `npx tsc --noEmit`               | —                     |
+| `test`       | `npx vitest run --coverage`      | `coverage-report`     |
+| `build`      | `npm run build`                  | `dist`                |
+| `storybook`  | `npm run build-storybook`        | `storybook-static`    |
 
-## Installation
+Runs are cancellable: a newer commit on the same ref cancels any
+in-flight run via a `concurrency` group.
 
-`npm install bubbletree`
+## What changed in 3.0
 
-or 
+| Concern         | Before                     | Now                                          |
+|-----------------|----------------------------|----------------------------------------------|
+| Language        | ES5 + JSDoc                | TypeScript strict                            |
+| DOM             | jQuery                     | Native + Lit (for components)                |
+| SVG rendering   | RaphaelJS                  | Native SVG elements                          |
+| Animation       | Tween.js                   | `requestAnimationFrame` + d3-ease            |
+| Routing         | jquery.history             | Native `hashchange`                          |
+| Build           | Gulp                       | Vite                                         |
+| Style           | Flat CSS                   | `@layer` + nesting + `@property` + animation |
+| Testing         | jscs (style only)          | Vitest + happy-dom + Storybook play tests    |
+| File layout     | One file per group         | One file per class / type / interface / enum |
 
-`bower install bubbletree` 
+## Attribution
+
+[Gregor Aisch](http://vis4.net/blog/) with contributions from Rufus Pollock
+and Levko Kravets.  Originally funded by Publish What You Fund and the
+Shuttleworth Foundation.
+
+## License
+
+MIT.  See file header.

@@ -1,13 +1,35 @@
 {
   "name": "bubbletree",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "BubbleTree is a library for interactive visualization of hierarchical data.",
+  "type": "module",
   "main": "dist/bubbletree.js",
+  "module": "dist/bubbletree.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/bubbletree.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./components": {
+      "import": "./dist/components.js",
+      "types": "./dist/components/index.d.ts"
+    },
+    "./style.css": "./dist/bubbletree.css"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "prepublish": "npm run build",
-    "build": "gulp",
-    "review": "jscs src"
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "repository": {
     "type": "git",
@@ -33,20 +55,27 @@
   },
   "homepage": "http://okfnlabs.org/bubbletree",
   "dependencies": {
-    "jquery": "^1.11.3",
-    "webpack-raphael": "^2.1.4",
-    "tween.js": "^16.3.1"
+    "d3-color": "^3.1.0",
+    "d3-ease": "^3.0.1",
+    "d3-selection": "^3.0.0",
+    "d3-transition": "^3.0.1",
+    "lit": "^3.1.4"
   },
   "devDependencies": {
-    "gulp": "^3.9.0",
-    "gulp-concat": "^2.6.0",
-    "gulp-file": "^0.2.0",
-    "gulp-rename": "^1.2.2",
-    "gulp-sourcemaps": "^1.6.0",
-    "gulp-uglify": "^1.5.1",
-    "jquery-migrate": "^1.2.1",
-    "jscs": "^2.7.0",
-    "marked": "^0.3.5",
-    "nunjucks": "^2.2.0"
+    "@storybook/addon-essentials": "^8.1.0",
+    "@storybook/addon-interactions": "^8.1.0",
+    "@storybook/test": "^8.1.0",
+    "@storybook/web-components": "^8.1.0",
+    "@storybook/web-components-vite": "^8.1.0",
+    "@types/d3-color": "^3.1.3",
+    "@types/d3-ease": "^3.0.2",
+    "@types/d3-selection": "^3.0.10",
+    "@types/d3-transition": "^3.0.8",
+    "@vitest/coverage-v8": "^1.6.0",
+    "happy-dom": "^14.7.0",
+    "storybook": "^8.1.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0",
+    "vitest": "^1.6.0"
   }
 }

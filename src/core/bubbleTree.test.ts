@@ -1,0 +1,153 @@
+/**
+ * bubbleTree.test.ts — construction, teardown, and listener hygiene.
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { BubbleTree } from './bubbleTree.js';
+import type { BubbleNode } from '../types/bubbleNode.js';
+
+/** Track every instance so afterEach can tear them down (no leaked listeners). */
+const created: BubbleTree[] = [];
+function track(tree: BubbleTree): BubbleTree {
+  created.push(tree);
+  return tree;
+}
+
+function makeContainer(): HTMLElement {
+  const el = document.createElement('div');
+  // happy-dom reports 0x0 without explicit sizing; stub the metrics the
+  // layout maths reads so construction produces a sane paper size.
+  Object.defineProperties(el, {
+    clientWidth: { value: 800, configurable: true },
+    clientHeight: { value: 600, configurable: true },
+  });
+  document.body.appendChild(el);
+  return el;
+}
+
+const sampleData: BubbleNode = {
+  label: 'Total',
+  amount: 100,
+  children: [
+    { label: 'A', amount: 60 },
+    { label: 'B', amount: 40 },
+  ],
+};
+
+describe('BubbleTree', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    window.location.hash = '';
+  });
+
+  afterEach(() => {
+    while (created.length) created.pop()!.destroy();
+  });
+
+  it('creates an SVG canvas inside the container', () => {
+    const container = makeContainer();
+    track(new BubbleTree({ container, data: sampleData }));
+    expect(container.querySelector('svg.bubbletree-canvas')).toBeTruthy();
+  });
+
+  it('ignores resize events fired before setData (no treeRoot yet)', () => {
+    const container = makeContainer();
+    track(new BubbleTree({ container, data: sampleData }));
+    // No setData() call: a resize must be a no-op rather than throwing.
+    expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
+  });
+
+  it('removes the resize listener on destroy', () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener');
+    const container = makeContainer();
+    const tree = new BubbleTree({ container, data: sampleData });
+    tree.destroy();
+    expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+    removeSpy.mockRestore();
+  });
+
+  it('is idempotent: destroy() can be called twice safely', () => {
+    const container = makeContainer();
+    const tree = new BubbleTree({ container, data: sampleData });
+    tree.destroy();
+    expect(() => tree.destroy()).not.toThrow();
+  });
+
+  it('stops responding to resize after destroy', () => {
+    const container = makeContainer();
+    const tree = new BubbleTree({ container, data: sampleData });
+    tree.setData(sampleData);
+    tree.destroy();
+    // Dispatching resize must not throw now that listeners are gone.
+    expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
+  });
+
+  describe('read-only state getters', () => {
+    it('returns undefined before setData', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      expect(tree.getCurrentNode()).toBeUndefined();
+      expect(tree.getRoot()).toBeUndefined();
+      expect(tree.getVisibleNodes()).toEqual([]);
+    });
+
+    it('returns the root after setData', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      expect(tree.getRoot()?.label).toBe('Total');
+      expect(tree.getCurrentNode()?.label).toBe('Total');
+    });
+
+    it('lists every visible bubble', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      // After the root view: at minimum the root and its two children must
+      // be on stage (siblings may or may not, depending on layout choice).
+      const labels = tree.getVisibleNodes().map((n) => n.label);
+      expect(labels).toContain('Total');
+      expect(labels).toContain('A');
+      expect(labels).toContain('B');
+    });
+
+    it('looks up nodes by their generated urlToken', () => {
+      const tree = track(new BubbleTree({ container: makeContainer(), data: sampleData }));
+      tree.setData(sampleData);
+      const root = tree.getRoot()!;
+      expect(tree.getNodeByUrlToken(root.urlToken!)).toBe(root);
+      expect(tree.getNodeByUrlToken('not-a-real-token')).toBeUndefined();
+    });
+  });
+
+  it('dispatches a viewchange event when setData first centres a node', () => {
+    const container = makeContainer();
+    const tree = track(new BubbleTree({ container, data: sampleData }));
+    const events: CustomEvent[] = [];
+    tree.addEventListener('viewchange', (e) => events.push(e as CustomEvent));
+    tree.setData(sampleData);
+    expect(events.length).toBe(1);
+    expect(events[0]!.detail.node.label).toBe('Total');
+    expect(events[0]!.detail.previous).toBeNull();
+  });
+
+  it('does not mutate the caller-supplied data tree', () => {
+    const container = makeContainer();
+    const input: BubbleNode = {
+      label: 'Total',
+      amount: 100,
+      children: [
+        { label: 'A', amount: 60 },
+        { label: 'B', amount: 40 },
+      ],
+    };
+    // Snapshot the input shape before handing it over.
+    const snapshot = JSON.stringify(input);
+
+    const tree = track(new BubbleTree({ container, data: input }));
+    tree.setData(input);
+
+    // The input is preserved exactly: no parent / level / urlToken / color
+    // / sorted-children mutation leaks out to the caller's object.
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect((input as BubbleNode).parent).toBeUndefined();
+    expect((input as BubbleNode).level).toBeUndefined();
+    expect((input as BubbleNode).urlToken).toBeUndefined();
+  });
+});

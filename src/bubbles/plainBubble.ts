@@ -69,20 +69,25 @@ export class PlainBubble extends BaseBubble {
     }
 
     if (this.label && this.label2) {
-      const showFull = r >= config.minRadiusLabels;
-      const showAmounts = r >= config.minRadiusAmounts;
-      const showAny = r >= config.minRadiusHideLabels;
       const desc = this.label.querySelector<HTMLElement>('.bubbletree-desc');
 
-      this.label.hidden = !showAny;
-      this.label2.hidden = showFull || !showAny;
-      if (desc) desc.hidden = showAny && !showFull && showAmounts ? true : !showAny;
+      // Start fully visible, then hide progressively as the radius shrinks.
+      // The thresholds form a single cascade (largest radius first):
+      //   r >= minRadiusLabels   inner amount + description, no outer label
+      //   r >= minRadiusAmounts  inner amount only, outer label shown
+      //   r >= minRadiusHide…    outer label only
+      //   smaller                nothing
+      this.label.hidden = false;
+      this.label2.hidden = false;
+      if (desc) desc.hidden = false;
 
-      if (showFull) {
+      if (r >= config.minRadiusLabels) {
         this.label2.hidden = true;
-      } else if (showAmounts) {
+      } else if (r >= config.minRadiusAmounts) {
         if (desc) desc.hidden = true;
-      } else if (!showAny) {
+      } else if (r >= config.minRadiusHideLabels) {
+        this.label.hidden = true;
+      } else {
         this.label.hidden = true;
         this.label2.hidden = true;
       }

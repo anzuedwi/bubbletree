@@ -14,6 +14,7 @@
 import { createSvgElement, resolveContainer } from '../util/dom.js';
 import { cssToken } from '../util/css.js';
 import { formatNumber } from '../util/format.js';
+import { effectiveDuration } from '../util/motion.js';
 import { hslColor, adjustLightness, adjustSaturation } from '../util/color.js';
 import { amountToRadius, setRadiusBase } from './utils.js';
 import { Vector } from './vector.js';
@@ -473,7 +474,9 @@ export class BubbleTree {
 
     const { layout, centeredNode } = this.planner.plan(requestedNode, this.plannerContext());
 
-    const duration = this.currentCenter === centeredNode ? 0 : 1000;
+    // Same-node re-centring needs 0 duration anyway; for genuine view
+    // changes consult the OS reduced-motion setting and fall back to 0.
+    const duration = this.currentCenter === centeredNode ? 0 : effectiveDuration(1000);
     const tr = new Transitioner(duration);
 
     // If a transition is still running, supersede it: move its pending

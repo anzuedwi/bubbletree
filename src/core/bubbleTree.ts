@@ -130,9 +130,22 @@ export class BubbleTree {
   // Public API
   // ---------------------------------------------------------------------------
 
-  /** Load and display a data tree. Called by Loader or directly. */
+  /**
+   * Load and display a data tree. Called by Loader or directly.
+   *
+   * The input is **deep-cloned** via structuredClone before any traversal
+   * runs, so the caller's object is never mutated. The library attaches a
+   * lot of bookkeeping to every node (`parent`, `level`, `urlToken`,
+   * `color`, sorted `children`, …); doing that to the caller's data caused
+   * surprising state changes for code that shared the model with other
+   * views.
+   *
+   * Note: structuredClone cannot serialise functions, DOM nodes, or class
+   * instances. Trees that contain those values must use only plain data.
+   */
   setData(data: BubbleNode): void {
-    this.initData(data);
+    const ownCopy = structuredClone(data);
+    this.initData(ownCopy);
     this.resizePaper();
     this.initBubbles();
     this.initHistory();

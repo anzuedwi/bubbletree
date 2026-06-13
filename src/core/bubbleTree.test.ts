@@ -80,4 +80,28 @@ describe('BubbleTree', () => {
     // Dispatching resize must not throw now that listeners are gone.
     expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
   });
+
+  it('does not mutate the caller-supplied data tree', () => {
+    const container = makeContainer();
+    const input: BubbleNode = {
+      label: 'Total',
+      amount: 100,
+      children: [
+        { label: 'A', amount: 60 },
+        { label: 'B', amount: 40 },
+      ],
+    };
+    // Snapshot the input shape before handing it over.
+    const snapshot = JSON.stringify(input);
+
+    const tree = track(new BubbleTree({ container, data: input }));
+    tree.setData(input);
+
+    // The input is preserved exactly: no parent / level / urlToken / color
+    // / sorted-children mutation leaks out to the caller's object.
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect((input as BubbleNode).parent).toBeUndefined();
+    expect((input as BubbleNode).level).toBeUndefined();
+    expect((input as BubbleNode).urlToken).toBeUndefined();
+  });
 });

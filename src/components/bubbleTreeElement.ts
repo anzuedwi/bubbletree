@@ -136,13 +136,11 @@ export class BubbleTreeElement extends LitElement {
     this.tree?.destroy();
     this.tree = null;
 
-    // Clone the data so consumers can keep their reference intact;
-    // BubbleTree mutates its input by attaching parent/level metadata.
-    const dataCopy = structuredClone(this.data);
-
+    // BubbleTree.setData() now deep-clones its input internally, so the
+    // wrapper no longer needs to clone defensively.
     const config: BubbleConfig = {
       container,
-      data: dataCopy,
+      data: this.data,
       bubbleType: this.bubbleType,
       bubbleStyles: this.bubbleStyles,
       autoColors: this.autoColors,
@@ -161,7 +159,7 @@ export class BubbleTreeElement extends LitElement {
     };
 
     this.tree = new BubbleTree(config);
-    this.tree.setData(dataCopy);
+    this.tree.setData(this.data);
   }
 }
 

@@ -102,6 +102,10 @@ export class BubbleTree extends EventTarget {
 
     this.svg = createSvgElement('svg');
     this.svg.classList.add('bubbletree-canvas');
+    // ARIA: announce the SVG as a tree widget so screen readers convey the
+    // hierarchical structure of the bubbles.
+    this.svg.setAttribute('role', 'tree');
+    this.svg.setAttribute('aria-label', 'Hierarchical bubble tree');
     this.container.prepend(this.svg);
 
     const w = this.container.clientWidth;
@@ -551,9 +555,30 @@ export class BubbleTree extends EventTarget {
     const previousCenter = this.currentCenter ?? null;
     this.currentCenter = centeredNode;
     if (previousCenter !== centeredNode) {
+      this.updateAriaExpanded(centeredNode);
       this.dispatchEvent(
         new ViewChangeEvent({ node: centeredNode, previous: previousCenter }),
       );
+    }
+  }
+
+  /**
+   * Maintain `aria-expanded` so assistive tech knows which branch is open.
+   * Exactly one bubble (the currently centred parent) gets aria-expanded=true;
+   * every other bubble with children is set back to false.
+   */
+  private updateAriaExpanded(centred: BubbleNode): void {
+    for (const obj of this.displayObjects) {
+      if (obj.kind !== DisplayKind.Bubble) continue;
+      const bubble = obj as BaseBubble;
+      const circle = bubble.getCircle();
+      if (!circle) continue;
+      const hasChildren = (bubble.node.children?.length ?? 0) > 0;
+      if (!hasChildren) {
+        circle.removeAttribute('aria-expanded');
+      } else {
+        circle.setAttribute('aria-expanded', bubble.node === centred ? 'true' : 'false');
+      }
     }
   }
 

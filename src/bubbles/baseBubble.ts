@@ -38,6 +38,11 @@ export abstract class BaseBubble implements DisplayObject {
 
   protected circle: SVGCircleElement | null = null;
   protected dashedBorder: SVGCircleElement | null = null;
+
+  /** The rendered SVG circle, or null if the bubble is currently hidden. */
+  getCircle(): SVGCircleElement | null {
+    return this.circle;
+  }
   protected label: HTMLDivElement | null = null;
   protected label2: HTMLDivElement | null = null;
   protected mouseGroup: MouseEventGroup | null = null;
@@ -80,7 +85,34 @@ export abstract class BaseBubble implements DisplayObject {
     circle.setAttribute('fill', this.color);
     const token = cssToken(this.node.id);
     if (token) circle.classList.add(token);
+    this.applyAriaAttributes(circle);
     return circle;
+  }
+
+  /**
+   * Tag a bubble's circle with ARIA attributes so the tree is navigable
+   * with assistive technology.
+   *
+   * The role is `treeitem` so screen readers announce the hierarchy. The
+   * label combines the node's human label with its formatted amount so
+   * the assistive announcement carries both pieces of information.
+   * `aria-level` is 1-indexed per WAI-ARIA spec.
+   *
+   * tabindex defaults to -1 (programmatic focus only); the keyboard
+   * navigator promotes exactly one bubble to tabindex=0 at a time using
+   * the roving-tabindex pattern.
+   */
+  protected applyAriaAttributes(circle: SVGCircleElement): void {
+    circle.setAttribute('role', 'treeitem');
+    circle.setAttribute('tabindex', '-1');
+    const level = (this.node.level ?? 0) + 1; // ARIA aria-level is 1-indexed
+    circle.setAttribute('aria-level', String(level));
+    const hasChildren = (this.node.children?.length ?? 0) > 0;
+    if (hasChildren) circle.setAttribute('aria-expanded', 'false');
+    const labelText = this.node.label ?? this.node.name ?? '';
+    const amountText = this.tree.config.formatValue(this.node.amount);
+    const aria = labelText ? `${labelText}, ${amountText}` : amountText;
+    circle.setAttribute('aria-label', aria);
   }
 
   protected createDashedBorder(radius: number, dasharray: string): SVGCircleElement {

@@ -28,6 +28,7 @@ import { SortBy } from '../enums/sortBy.js';
 import { DisplayKind } from '../enums/displayKind.js';
 import type { BubbleConfig, ResolvedBubbleConfig } from '../types/bubbleConfig.js';
 import type { BubbleNode } from '../types/bubbleNode.js';
+import type { BubbleStyleEntry } from '../types/bubbleStyle.js';
 import type { DisplayObject } from '../types/displayObject.js';
 import type { TooltipEvent } from '../types/tooltipEvent.js';
 import type { BaseBubble } from '../bubbles/baseBubble.js';
@@ -262,28 +263,44 @@ export class BubbleTree {
     const styles = this.config.bubbleStyles;
     if (!styles) return;
 
-    const props = ['color', 'shortLabel', 'icon'] as const;
-    for (const prop of props) {
-      if (node.id && styles.id?.[node.id]?.[prop] !== undefined) {
-        (node as Record<string, unknown>)[prop] = styles.id[node.id][prop];
-      } else if (node.name && styles.name?.[node.name]?.[prop] !== undefined) {
-        (node as Record<string, unknown>)[prop] = styles.name[node.name][prop];
-      } else if (node.taxonomy) {
-        const taxEntry = styles[node.taxonomy] as Record<string, Record<string, unknown>> | undefined;
-        if (node.name && taxEntry?.[node.name]?.[prop] !== undefined) {
-          (node as Record<string, unknown>)[prop] = taxEntry[node.name][prop];
-        }
-      }
-    }
+    // Resolve the most specific matching style entry, in priority order:
+    // by id, then by name, then by taxonomy + name.
+    const byId = node.id ? styles.id?.[node.id] : undefined;
+    const byName = node.name ? styles.name?.[node.name] : undefined;
+    const byTaxonomy = this.lookupTaxonomyStyle(node);
 
+    // Apply from least to most specific so higher-priority entries win.
+    this.applyStyleEntry(node, byTaxonomy);
+    this.applyStyleEntry(node, byName);
+    this.applyStyleEntry(node, byId);
+
+    // The dynamic getStyle() callback overrides everything else.
     if (typeof styles.getStyle === 'function') {
-      const override = styles.getStyle(node, index);
-      for (const prop of props) {
-        if (override[prop] !== undefined) {
-          (node as Record<string, unknown>)[prop] = override[prop];
-        }
-      }
+      this.applyStyleEntry(node, styles.getStyle(node, index));
     }
+  }
+
+  /** Look up a style entry by the node's taxonomy bucket and name. */
+  private lookupTaxonomyStyle(node: BubbleNode): BubbleStyleEntry | undefined {
+    const styles = this.config.bubbleStyles;
+    if (!styles || !node.taxonomy || !node.name) return undefined;
+    const bucket = styles[node.taxonomy];
+    // The taxonomy bucket is a Record<string, BubbleStyleEntry>; the index
+    // signature also admits the getStyle function, so guard against that.
+    if (!bucket || typeof bucket === 'function') return undefined;
+    return bucket[node.name];
+  }
+
+  /**
+   * Copy the three styleable properties from an entry onto a node.
+   * Type-safe: each property is assigned through its real declared type,
+   * so no `Record<string, unknown>` casts are needed.
+   */
+  private applyStyleEntry(node: BubbleNode, entry: BubbleStyleEntry | undefined): void {
+    if (!entry) return;
+    if (entry.color !== undefined) node.color = entry.color;
+    if (entry.shortLabel !== undefined) node.shortLabel = entry.shortLabel;
+    if (entry.icon !== undefined) node.icon = entry.icon;
   }
 
   private pickColor(node: BubbleNode, index: number): string {
